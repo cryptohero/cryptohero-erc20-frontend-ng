@@ -15,18 +15,18 @@ export default {
   SET_ITEM(state, { id, item }) {
     Vue.set(state.items, id, item);
   },
+  BATCH_SET_ITEMS(state, items) {
+    items.forEach(item => {
+      Vue.set(state.items, item.id, item);
+    });
+  },
   SET_AD(state, { id, ad }) {
     Vue.set(state.ads, id, ad);
+  },
+  SetPayTokenInfo(state, info) {
+    state.payTokenInfo = info;
+  },
+  SetPayTokenBalance(state, balance) {
+    Vue.set(state.payTokenInfo, "balance", balance);
   }
-  /* Examples:
-  [types.ADD_TO_CART](state, payload) {
-    state.cart.push(payload);
-  },
-  // this.$store.commit(types.ADD_TO_CART, product);
-
-  increment(state) {
-    state.count++;
-  },
-  // this.$store.commit('increment');
-  */
 };

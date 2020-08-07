@@ -24,7 +24,7 @@
                         toDisplayedPrice(item.price)
                       }}
                     </p>
-                    <p class="subtitle is-6">{{ $t("Slogan") }}: {{ ad }}</p>
+                    <!-- <p class="subtitle is-6">{{ $t("Slogan") }}: {{ ad }}</p> -->
                   </div>
                 </div>
               </div>
@@ -46,17 +46,21 @@
               <li>{{$t('Current Price')}}：{{toDisplayedPrice(item.price)}}</li>
             </ul>
             <p class="item-slogan">{{$t('Slogan')}}: {{ad}}</p>-->
-            <article v-if="notOwner" class="message is-warning">
+            <!-- <article v-if="notOwner" class="message is-warning">
               <div class="message-body">{{ $t("EDIT_SLOGAN_TIP") }}</div>
-            </article>
+            </article> -->
           </div>
 
           <template v-if="notOwner">
             <div class="buttons">
-              <button class="button is-danger is-outlined" @click="onBuy(1)">
-                {{ $t("BUY_BTN") }}
+              <button
+                class="button is-danger is-outlined"
+                @click="onBuy(1)"
+                :disabled="isBuying"
+              >
+                {{ isBuying ? $t("BUYING_BTN") : $t("BUY_BTN") }}
               </button>
-              <button class="button is-danger is-outlined" @click="onBuy(1.1)">
+              <!-- <button class="button is-danger is-outlined" @click="onBuy(1.1)">
                 {{ $t("PREMIUM_BUY_BTN", { rate: "10%" }) }}
               </button>
               <button class="button is-danger is-outlined" @click="onBuy(1.2)">
@@ -70,19 +74,23 @@
               </button>
               <button class="button is-danger is-outlined" @click="onBuy(1.5)">
                 {{ $t("PREMIUM_BUY_BTN", { rate: "50%" }) }}
-              </button>
+              </button> -->
             </div>
-            <article class="message is-danger">
-              <div class="message-body">{{ $t("BUY_PRICE_TIP") }}</div>
-            </article>
+            <BuyNotifications
+              v-if="payTokenInfo"
+              :payTokenInfo="payTokenInfo"
+              :buyStep="buyStep"
+              :price="item.price"
+            />
           </template>
 
           <template v-if="isOwner">
-            <div class="buttons">
+            <!-- <div class="buttons">
               <button class="button is-warning" @click="onUpdateAd">
                 {{ $t("Edit Slogan") }}
               </button>
-            </div>
+            </div> -->
+            <p>你拥有这个卡牌。</p>
           </template>
         </div>
       </div>
@@ -92,15 +100,25 @@
 </template>
 
 <script>
-import { buyItem, setGg, setNextPrice } from "@/api";
+import { buyItem, approveSpending } from "@/api";
 import { toReadablePrice } from "@/util";
+import BuyNotifications from "../components/BuyNotifications";
+import { mapState } from "vuex";
 
 export default {
   name: "item-view",
 
-  data: () => ({}),
+  data: () => ({
+    buyStep: 0,
+    isBuying: false
+  }),
+
+  components: {
+    BuyNotifications
+  },
 
   computed: {
+    ...mapState(["payTokenInfo"]),
     ownerTag() {
       return this.item.owner.slice(-6).toUpperCase();
     },
@@ -140,41 +158,32 @@ export default {
   watch: {},
 
   methods: {
-    onBuy(rate) {
+    async onBuy(rate) {
       if (this.$store.state.signInError) {
         return this.$router.push({ name: "Login" });
       }
-      const buyPrice = this.item.price.times(rate).toFixed(0);
-      buyItem(this.itemId, buyPrice)
-        .then(() => {
-          alert(this.$t("BUY_SUCCESS_MSG"));
-          setNextPrice(this.itemId, buyPrice);
-        })
-        .catch(e => {
-          alert(this.$t("BUY_FAIL_MSG"));
-          console.log(e);
-        });
+      const buyPrice = (this.item.price * rate).toFixed(0);
+      try {
+        this.isBuying = true;
+        this.buyStep = 1;
+        await approveSpending(buyPrice, this.me);
+        this.buyStep = 2;
+        await buyItem(this.itemId, this.me);
+        this.buyStep = 3;
+      } catch (e) {
+        this.buyStep = -1;
+        alert(this.$t("BUY_FAIL_MSG"));
+        console.log(e);
+      }
+      this.isBuying = false;
     },
     toDisplayedPrice(priceInWei) {
-      const readable = toReadablePrice(priceInWei);
-      return `${readable.price} ${readable.unit}`;
-    },
-    async onUpdateAd() {
-      const ad = prompt(this.$t("UPDATE_SLOGAN_PROMPT"));
-      if (ad !== null) {
-        if (ad.length > 100) {
-          return alert(this.$t("UPDATE_SLOGAN_FAIL_TOO_LOOG_MSG"));
-        }
-        setGg(this.itemId, ad)
-          .then(() => {
-            this.$store.dispatch("FETCH_AD", this.itemId);
-          })
-          .catch(e => {
-            alert(this.$t("UPDATE_SLOGAN_FAIL_MSG"));
-            console.log(e);
-          });
-      }
-      return 0;
+      const { payTokenInfo } = this;
+      const readable = toReadablePrice(
+        priceInWei,
+        (payTokenInfo && payTokenInfo.decimals) || 4
+      );
+      return `${readable.price} ${payTokenInfo && payTokenInfo.symbol}`;
     }
   }
 };

@@ -40,9 +40,6 @@
                     {{ item.price && toDisplayedPrice(item.price) }}
                   </li>
                 </ul>
-                <!-- <p class="item-slogan">
-                  {{ $t("Slogan") }}: {{ toDisplayedAd(item.id) }}
-                </p> -->
               </div>
             </div>
           </div>
@@ -54,6 +51,7 @@
 
 <script>
 import { toReadablePrice } from "@/util";
+import { mapState } from "vuex";
 
 export default {
   name: "item-lists",
@@ -62,6 +60,7 @@ export default {
   data: () => ({}),
 
   computed: {
+    ...mapState(["payTokenInfo"]),
     items() {
       return this.itemIds.map(id => {
         const item = this.$store.state.items[id];
@@ -72,8 +71,9 @@ export default {
 
   methods: {
     toDisplayedPrice(priceInWei) {
-      const readable = toReadablePrice(priceInWei);
-      return `${readable.price} ${readable.unit}`;
+      const { payTokenInfo } = this;
+      const readable = toReadablePrice(priceInWei, payTokenInfo.decimals);
+      return `${readable.price} ${payTokenInfo && payTokenInfo.symbol}`;
     },
     toDisplayedAd(id) {
       const ad = this.$store.state.ads[id];
@@ -90,12 +90,12 @@ export default {
   created() {},
 
   watch: {
-    itemIds(newItemIds) {
-      newItemIds.forEach(itemId => {
-        this.$store.dispatch("FETCH_ITEM", itemId);
-        this.$store.dispatch("FETCH_AD", itemId);
-      });
-    }
+    // itemIds(newItemIds) {
+    //   newItemIds.forEach(itemId => {
+    //     this.$store.dispatch("FETCH_ITEM", itemId);
+    //     this.$store.dispatch("FETCH_AD", itemId);
+    //   });
+    // }
   }
 };
 </script>

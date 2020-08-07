@@ -4,11 +4,19 @@ import web3 from "@/web3";
 import * as config from "@/config";
 import timeout from "timeout-then";
 import cryptoWaterMarginABI from "./abi/cryptoWaterMargin.json";
+import ERC20ABI from "./abi/ERC20.json";
+import BatchGetCardsABI from "./abi/BatchGetCards.json";
 
 const network = config.network[4];
 const cryptoWaterMarginContract = new web3.eth.Contract(
   cryptoWaterMarginABI,
   network.contract
+);
+const erc20Token = new web3.eth.Contract(ERC20ABI, network.token);
+
+const BatchGetCards = new web3.eth.Contract(
+  BatchGetCardsABI,
+  "0x6fa9CF4755C180bDddd74847BA1c95587701516A"
 );
 
 let store = [];
@@ -18,10 +26,20 @@ export const getStoreData = async () => {
   // @todo: impl needed
 };
 
+export const getPayTokenInfo = async () => {
+  const [name, symbol, decimals] = await Promise.all([
+    erc20Token.methods.name().call(),
+    erc20Token.methods.symbol().call(),
+    erc20Token.methods.decimals().call()
+  ]);
+  return { name, symbol, decimals };
+};
+
 export const getMe = async () => {
   if (!window.ethereum) {
     throw Error("NO_METAMASK");
   }
+  await window.ethereum.enable();
   const [address] = await web3.eth.getAccounts();
   if (!address) throw Error("METAMASK_NOT_ENABLED");
   return address;
@@ -45,54 +63,6 @@ export const getGg = async (id, time = 0) => {
   return "";
 };
 
-export const setGg = async (id, str) => {
-  // @todo: need impl
-  // const response = await request
-  //   .get("https://api.leancloud.cn/1.1/classes/ad")
-  //   .set({
-  //     "X-LC-Id": "R6A46DH2meySCVNM1uWOoW2M-gzGzoHsz",
-  //     "X-LC-Key": "8R6rGgpHa0Y9pq8uO53RAPCB",
-  //   })
-  //   .type("json")
-  //   .accept("json");
-  // if (response.body && response.body.results) {
-  //   store = response.body.results;
-  // }
-  // const item = store.find((x) => x.id === `${id}`);
-  // if (item) {
-  //   // update
-  //   await request
-  //     .put(`https://api.leancloud.cn/1.1/classes/ad/${item.objectId}`)
-  //     .set({
-  //       "X-LC-Id": "R6A46DH2meySCVNM1uWOoW2M-gzGzoHsz",
-  //       "X-LC-Key": "8R6rGgpHa0Y9pq8uO53RAPCB",
-  //     })
-  //     .type("json")
-  //     .accept("json")
-  //     .send({
-  //       str,
-  //     });
-  //   // update store
-  //   item.str = str;
-  // } else {
-  //   // create
-  //   await request
-  //     .post("https://api.leancloud.cn/1.1/classes/ad")
-  //     .set({
-  //       "X-LC-Id": "R6A46DH2meySCVNM1uWOoW2M-gzGzoHsz",
-  //       "X-LC-Key": "8R6rGgpHa0Y9pq8uO53RAPCB",
-  //     })
-  //     .type("json")
-  //     .accept("json")
-  //     .send({
-  //       id: `${id}`,
-  //       str,
-  //     });
-  //   // update store
-  // }
-  return "";
-};
-
 // 获取此卡片的推荐nextPrice，需要和卡片blockchain上的nextPrice进行比较，选择较大的创建交易
 export const getNextPrice = async (id, time = 0) => {
   if (!isInit) {
@@ -111,12 +81,6 @@ export const getNextPrice = async (id, time = 0) => {
   }
 
   return 0;
-};
-
-// price为用户成功发起交易的交易价格，调用setNextPrice后，nextPrice会变为此价格的1.1倍
-export const setNextPrice = async (id, price) => {
-  // @todo: need rewrite
-  return price * 1.1;
 };
 
 export const getItem = async id => {
@@ -142,12 +106,36 @@ export const getItem = async id => {
   return item;
 };
 
-export const buyItem = (id, price) =>
-  cryptoWaterMarginContract.methods.buy(id).send({
-    value: price, // web3.utils.toWei(Number(price), 'ether'),
-    gas: 220000,
-    gasPrice: 1000000000 * 100
+export const BatchGetCardsItem = async () => {
+  const rawResultArray = await BatchGetCards.methods
+    .getCard(network.contract, 114)
+    .call();
+  const cards = rawResultArray.map(({ id, nextPrice, owner, price }) => {
+    const card = config.cards[id] || {};
+    return {
+      id,
+      nextPrice,
+      owner,
+      price,
+      name: card.name,
+      nickname: card.nickname
+    };
   });
+  return cards;
+};
+
+export const approveSpending = (price, from) =>
+  erc20Token.methods.approve(network.contract, price).send({
+    from
+  });
+
+export const buyItem = (id, from) =>
+  cryptoWaterMarginContract.methods.buy(id).send({
+    from
+  });
+
+export const getTokenBalanceOf = address =>
+  erc20Token.methods.balanceOf(address).call();
 
 export const getTotal = () =>
   cryptoWaterMarginContract.methods.totalSupply().call();

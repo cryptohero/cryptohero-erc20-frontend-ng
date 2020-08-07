@@ -24,6 +24,11 @@
       </div>
 
       <div class="navbar-end">
+        <div class="navbar-item" v-if="isOkToDisplayBalance">
+          <div class="field is-grouped">
+            <p class="control">支付代币余额： {{ tokenBalance }}</p>
+          </div>
+        </div>
         <div class="navbar-item">
           <div class="field is-grouped">
             <p class="control">
@@ -57,7 +62,9 @@
 </template>
 
 <script>
+import { toReadablePrice } from "@/util";
 import { getNetwork, getAnnouncements } from "@/api";
+import { mapState } from "vuex";
 
 export default {
   name: "Header",
@@ -69,7 +76,7 @@ export default {
   },
   async created() {
     this.$store.dispatch("initLocale");
-    this.$store.dispatch("FETCH_ME");
+    // this.$store.dispatch("FETCH_ME");
     const network = await getNetwork();
     if (!network) {
       alert("Please switch to Rinkeby testnet and refresh the page!");
@@ -89,6 +96,15 @@ export default {
     this.infos = infos;
   },
   computed: {
+    ...mapState(["payTokenInfo", "me"]),
+    isOkToDisplayBalance() {
+      return this.me && this.payTokenInfo && this.payTokenInfo.balance;
+    },
+    tokenBalance() {
+      const { balance, symbol, decimals } = this.payTokenInfo;
+      const readable = toReadablePrice(balance, decimals);
+      return `${readable.price} ${symbol}`;
+    },
     locale: {
       get() {
         const locale = this.$store.state.locale;

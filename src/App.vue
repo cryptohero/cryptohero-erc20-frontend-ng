@@ -11,14 +11,27 @@
 </template>
 
 <script>
+import { getAppName } from "./util";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { mapActions } from "vuex";
 
 export default {
   name: "App",
   components: {
     Header,
     Footer
+  },
+  methods: {
+    ...mapActions(["FETCH_ME", "FetchCards"]),
+    initAppName() {
+      document.title = getAppName();
+    }
+  },
+  mounted() {
+    this.initAppName();
+    this.FETCH_ME();
+    this.FetchCards();
   },
   computed: {
     key() {
